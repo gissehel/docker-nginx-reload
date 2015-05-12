@@ -1,0 +1,96 @@
+containers:
+    web:
+        image: "gissehel/nginx-with-reload"
+        dockerfile: "../../dockerfiles/nginx-with-reload"
+        rm:
+            volumes: true
+        run:
+            detach: true
+            hostname: "web"
+            volume:
+                - "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw"
+                - "/opt/storage/nginx/log:/var/log/nginx:rw"
+                - "/opt/storage/nginx/control:/etc/nginx/control:rw"
+            publish:
+                - "80:80"
+    ghost:
+        image: "ghost"
+        rm:
+            volumes: true
+        run:
+            detach: true
+            hostname: "ghost"
+            volume:
+                - "/opt/storage/ghost:/var/lib/ghost:rw"
+    ghost-expose:
+        image: "gissehel/expose-to-nginx"
+        dockerfile: "../../dockerfiles/expose-to-nginx"
+        rm:
+            volumes: true
+        run:
+            interactive: true
+            tty: true
+            rm: true
+            volume:
+                - "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw"
+                - "/opt/storage/nginx/log:/var/log/nginx:rw"
+                - "/opt/storage/nginx/control:/etc/nginx/control:rw"
+            link:
+                - "ghost:slot"
+            env:
+                - "NAME=ghost"
+                - "NAMES=ghost.example.com www.ghost.example.com"
+                - "PORT=2368"
+    dui:
+        image: "crosbymichael/dockerui"
+        rm:
+            volumes: true
+        run:
+            detach: true
+            privileged: true
+            volume:
+                - "/var/run/docker.sock:/var/run/docker.sock"
+    dui-adduser:
+        image: "gissehel/expose-to-nginx"
+        dockerfile: "../../dockerfiles/expose-to-nginx"
+        rm:
+            volumes: true
+        run:
+            interactive: true
+            tty: true
+            rm: true
+            volume:
+                - "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw"
+            env:
+                - "AUTHFILE=conf.d/dui-password-file"
+            cmd: [ "/bin/bash", "/newuser" ]
+    dui-expose:
+        image: "gissehel/expose-to-nginx"
+        dockerfile: "../../dockerfiles/expose-to-nginx"
+        rm:
+            volumes: true
+        run:
+            interactive: true
+            tty: true
+            rm: true
+            volume:
+                - "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw"
+                - "/opt/storage/nginx/log:/var/log/nginx:rw"
+                - "/opt/storage/nginx/control:/etc/nginx/control:rw"
+            link:
+                - "dui:slot"
+            env:
+                - "NAME=dockerui"
+                - "NAMES=dui.example.com"
+                - "PORT=9000"
+                - "AUTHFILE=conf.d\\/dui-password-file"
+groups:
+    defaut: [ web, dui, ghost ]
+    services: [ dui, ghost, dui-expose, ghost-expose ]
+    config: [ dui-adduser ]
+    duis: [ dui, dui-expose ]
+    ghosts: [ ghost, ghost-expose ]
+
+
+
+
