@@ -1,12 +1,13 @@
 # Urls
 
-* https://registry.hub.docker.com/u/gissehel/nginx-with-reload
-* https://registry.hub.docker.com/u/gissehel/expose-to-nginx
-* https://github.com/gissehel/docker-nginx-reload
+* [https://registry.hub.docker.com/u/gissehel/nginx-with-reload](https://registry.hub.docker.com/u/gissehel/nginx-with-reload)
+* [https://registry.hub.docker.com/u/gissehel/expose-to-nginx](https://registry.hub.docker.com/u/gissehel/expose-to-nginx)
+* [https://github.com/gissehel/docker-nginx-reload](https://github.com/gissehel/docker-nginx-reload)
 
 # The problem
 
 Imagine you're in that situation:
+
 * You're running a lot of different applications on your server
 * They are hosted in docker containers and they all export a port accessible using HTTP
 * You want to have a nginx as a front-end
@@ -20,8 +21,13 @@ You don't want your nginx container to explicitly depend upon all your other app
 # The solution
 
 This solution is composed of two images :
+
 * [gissehel/ginx-with-reload](https://registry.hub.docker.com/u/gissehel/nginx-with-reload) that will contain the nginx process, and way to reload the nginx process.
+    * [Dockerfile](https://github.com/gissehel/docker-nginx-reload/blob/master/dockerfiles/ginx-with-reload/Dockerfile)
+    * [script.sh](https://github.com/gissehel/docker-nginx-reload/blob/master/dockerfiles/ginx-with-reload/script.sh)
 * [gissehel/expose-to-nginx](https://registry.hub.docker.com/u/gissehel/expose-to-nginx) that will handle the proxy settings generation, and will send the appropriate reload to the nginx container.
+    * [Dockerfile](https://github.com/gissehel/docker-nginx-reload/blob/master/dockerfiles/expose-to-nginx/Dockerfile)
+    * [script.sh](https://github.com/gissehel/docker-nginx-reload/blob/master/dockerfiles/expose-to-nginx/script.sh)
 
 # Examples
 
