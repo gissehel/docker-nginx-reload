@@ -1,12 +1,12 @@
 # Introduction
 
-this example shows how to use both images [gissehel/nginx-with-reload] and [gissehel/expose-to-nginx] using [docker] and [crane].
+this example shows how to use both images [gissehel/nginx-with-reload] and [gissehel/expose-to-nginx] using [docker] command line only (no automation tool like [crane] or [docker-compose]/fig).
 
 If you're reading this and want to execute the command, perhaps you want to change the following detail to the crane.yaml file before starting:
 
-* The path `/opt/storage` is used in this example to storage all data for containers. Perhaps you want to change all occurences of that path in `crane.yaml` if you want to store the files elsewhere
+* The path `/opt/storage` is used in this example to storage all data for containers. Perhaps you want to change all occurences of that path in all command lines if you want to store the files elsewhere
 * The name `.example.com` is used for vhosts. Perhaps yo want to use **your** domain here. If you don't have one, or you don't have one yet, you can edit `/etc/hosts` (or `c:\Windows\System32\drivers\etc\hosts`) to add the line `127.0.0.1 *.example.com`
-* If your port 80 is already binded, change `"80:80"` in `crane.yaml` to `"8000:80"` and use `http://ghost.example.com:8000/` instead of `http://ghost.example.com/` each time you want to test something in the browser
+* If your port 80 is already binded, change `"80:80"` in command lines to `"8000:80"` and use `http://ghost.example.com:8000/` instead of `http://ghost.example.com/` each time you want to test something in the browser
 
 # Tutorial
 
@@ -31,25 +31,25 @@ Pulling repository crosbymichael/dockerui
 ## Start the web server
 
 ```bash
-$ sudo crane run web
-Running container web ... 4065b1a51aacdc79e083764ee3ec9a0026d48470aad0512fcd7ea37e3cbb8dd7
+$ sudo docker run --name web -d -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw" -v "/opt/storage/nginx/control:/etc/nginx/control:rw" -p "80:80" --hostname "web" "gissehel/nginx-with-reload"
+deb5a6c35d9f1a66f1d0f2349b7cd4594468f24382a7aef246e27d18d4ba86de
 ```
 
 ## Start "ghost"
 
 Ghost is a simple blog platform.
 ```bash
-$ sudo crane run ghost
-Running container ghost ... f81d014ebb15ac0e12c9ae8a51e21b4fc763f9cd90afcef7b7e93844b337f466
+$ sudo docker run --name ghost -d --hostname ghost -v "/opt/storage/ghost:/var/lib/ghost:rw" "ghost"
+196f86252c0cc15b14cdb8e4e345286f930d788028b91d7153da9607582775d2
 ```
 
 The url `http://ghost.example.com/` should **not** work right now.
 
 ## Configure nginx to proxy ghost
 
+run container `ghost-expose` (it will end quickly):
 ```bash
-$ sudo crane run ghost-expose
-Running container ghost-expose ...
+$ sudo docker run -it --rm=true -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw" -v "/opt/storage/nginx/control:/etc/nginx/control:rw" --link "ghost:slot" -e "NAME=ghost" -e "NAMES=ghost.example.com www.ghost.example.com" -e "PORT=2368" "gissehel/expose-to-nginx"
 ```
 
 That's it... Now The url `http://ghost.example.com/` should work. (Note that example.com should either have been replaced by your domain, or you should have change your hosts file as stated in the introduction for this to work)
@@ -76,7 +76,7 @@ That's it... Now The url `http://ghost.example.com/` should work. (Note that exa
 
 So the `ghost-expose` know exactly where to proxy, and what configuration files to create.
 
-`ghost-expose` also share the 3 same folders as the `web`  containers, this allow him to:
+`ghost-expose` also share the 3 same folders as the `web` containers, this allow him to:
 * write a new/overwrite a configuration file in the `/etc/nginx/conf.d` directory of the `web` container.
 * put it's logs in the `/var/log/nginx` directory of the `web` container. (Well, it could be another directory here, it wouldn't change the face of the world).
 * send a message in the `/etc/nginx/control/nginx-fifo` fifofile. This message will be read by a process in the nginx container, and it reload the configuration without restarting nginx.
@@ -106,8 +106,8 @@ But we have one more env. variable.
 Before starting dockerui we need to create a file `dui-password-file`. For that, we will use again the image `gissehel/expose-to-nginx`  but with other parameters.
 
 ```bash
-$ sudo crane run dui-adduser
-Running container dui-adduser ... User? test
+$ sudo docker run -it --rm=true -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -e "AUTHFILE=conf.d/dui-password-file" "gissehel/expose-to-nginx" /bin/bash /newuser
+User? test
 New password:
 Re-type new password:
 Adding password for user test
@@ -118,10 +118,9 @@ just type the username you want to access to the site, type the password twice, 
 
 Now run the containers `dui` and `dui-expose`
 ```bash
-$ sudo crane run dui dui-expose
-Running container dui ... 719bb8f804f897ad7f39830628ffb5b4af1e7707feaf2834bd29e12f88c74db8
-Running container dui-expose ... 
-$ 
+$ sudo docker run --name=dui -d --privileged=true -v "/var/run/docker.sock:/var/run/docker.sock" "crosbymichael/dockerui"
+b6e71a70aa11b62f817213ff91bf3b44553709b35eb7c8ab85d4193701848752
+$ sudo docker run -it --rm=true -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw -v "/opt/storage/nginx/control:/etc/nginx/control:rw" --link "dui:slot" -e "NAME=dockerui" -e "NAMES=dui.example.com" -e  "PORT=9000" -e "AUTHFILE=conf.d\\/dui-password-file" "gissehel/expose-to-nginx"
 ```
 
 and try the url `http//dui.example.com/`. A login/password will be prompt. Put the one you choose (In the previous example test/\*\*\*\*).
@@ -130,43 +129,53 @@ You can now try again `http://ghost.example.com/` it should not ask you for a pa
 
 ## Restart a container from scratch
 
-To restart dockerui, just do :
+To restart dockerui, do :
 ```bash
-$ sudo crane run -r dui dui-expose
+$ sudo docker stop dui
+$ sudo docker rm -v dui
+$ sudo docker run --name=dui -d --privileged=true -v "/var/run/docker.sock:/var/run/docker.sock" "crosbymichael/dockerui"
+$ sudo docker run -it --rm=true -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw -v "/opt/storage/nginx/control:/etc/nginx/control:rw" --link "dui:slot" -e "NAME=dockerui" -e "NAMES=dui.example.com" -e  "PORT=9000" -e "AUTHFILE=conf.d\\/dui-password-file" "gissehel/expose-to-nginx"
 ```
 
-to restart ghost, just do :
+to restart ghost, do :
 ```bash
-$ sudo crane run -r ghost ghost-expose
+$ sudo docker stop ghost
+$ sudo docker rm -v ghost
+$ sudo docker run --name ghost -d --hostname ghost -v "/opt/storage/ghost:/var/lib/ghost:rw" "ghost"
+$ sudo docker run -it --rm=true -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw" -v "/opt/storage/nginx/control:/etc/nginx/control:rw" --link "ghost:slot" -e "NAME=ghost" -e "NAMES=ghost.example.com www.ghost.example.com" -e "PORT=2368" "gissehel/expose-to-nginx"
 ```
 
 Of course, if you restart the web container, it will still work :
 ```bash
-$ sudo crane run -r web
+$ sudo docker stop web
+$ sudo docker rm -v web
+$ sudo docker run --name web -d -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw" -v "/opt/storage/nginx/control:/etc/nginx/control:rw" -p "80:80" --hostname "web" "gissehel/nginx-with-reload"
 ```
 
 # Quick version
 
 If you want to have everything from this tutorial running without the step-by-step and the explainations, here are the commands :
 ```bash
-$ sudo crane run dui-adduser
-Running container dui-adduser ... User? test
+$ sudo docker run -it --rm=true -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -e "AUTHFILE=conf.d/dui-password-file" "gissehel/expose-to-nginx" /bin/bash /newuser
+User? test
 New password:
 Re-type new password:
 Adding password for user test
 
-$ sudo crane run -r web
-Running container web ... a0a28be5fbc7e03ea4b494868b5482355e022573f431c709c0f86cef0af5d373
-$ sudo crane run -r dui dui-expose ghost ghost-expose
-Running container dui ... e792fb103b0c80f9d8b8dc82f7650a0d5cbae0dcbbeeb0373701dd7bd1b50f8f
-Running container dui-expose ... Running container ghost ... 680eb578be6e61123fee85f60d94fdd56855812a84431dfcdb4167b7094a439a
-Running container ghost-expose ... 
+$ sudo docker run --name web -d -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw" -v "/opt/storage/nginx/control:/etc/nginx/control:rw" -p "80:80" --hostname "web" "gissehel/nginx-with-reload"
+$ sudo docker run --name ghost -d --hostname ghost -v "/opt/storage/ghost:/var/lib/ghost:rw" "ghost"
+$ sudo docker run --name=dui -d --privileged=true -v "/var/run/docker.sock:/var/run/docker.sock" "crosbymichael/dockerui"
+$ sudo docker run -it --rm=true -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw" -v "/opt/storage/nginx/control:/etc/nginx/control:rw" --link "ghost:slot" -e "NAME=ghost" -e "NAMES=ghost.example.com www.ghost.example.com" -e "PORT=2368" "gissehel/expose-to-nginx"
+$ sudo docker run -it --rm=true -v "/opt/storage/nginx/conf.d:/etc/nginx/conf.d:rw" -v "/opt/storage/nginx/log:/var/log/nginx:rw -v "/opt/storage/nginx/control:/etc/nginx/control:rw" --link "dui:slot" -e "NAME=dockerui" -e "NAMES=dui.example.com" -e  "PORT=9000" -e "AUTHFILE=conf.d\\/dui-password-file" "gissehel/expose-to-nginx"
 ```
+
+Also, you should really consider an automation tool like [crane]/[docker-compose] or any classical tool like ansible/chef/pupper.
 
 [gissehel/nginx-with-reload]:https://registry.hub.docker.com/u/gissehel/nginx-with-reload
 [gissehel/expose-to-nginx]:https://registry.hub.docker.com/u/gissehel/expose-to-nginx
 [docker]:http://docker.com/
 [crane]:https://github.com/michaelsauter/crane
 [dockerui]:https://github.com/crosbymichael/dockerui
+[docker-compose]:https://docs.docker.com/compose
 
 
