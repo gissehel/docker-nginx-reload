@@ -26,10 +26,10 @@ This solution is composed of two images :
 # Examples
 
 ## Using crane
-[Crane example](https://github.com/gissehel/docker-nginx-reload/examples/crane)
+[Crane example](https://github.com/gissehel/docker-nginx-reload/tree/master/examples/crane)
 
 ## Using raw docker commands
-[raw docker example](https://github.com/gissehel/docker-nginx-reload/examples/raw)
+[raw docker example](https://github.com/gissehel/docker-nginx-reload/tree/master/examples/raw)
 
 
 
